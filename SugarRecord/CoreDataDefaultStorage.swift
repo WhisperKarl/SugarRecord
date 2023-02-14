@@ -87,6 +87,26 @@ public class CoreDataDefaultStorage: Storage {
             }
         }
     }
+    @available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)
+    public func backgroundOperation(_ operation: @escaping (_ context: Context, _ save: @escaping () async throws -> Void) throws  -> Void) async throws -> Void {
+        let context: NSManagedObjectContext = saveContext as! NSManagedObjectContext
+        do {
+            try await context.perform({
+                try operation (context) { () -> Void in
+                    do {
+                        try context.save()
+                        try await self.rootSavingContext.perform {
+                            try self.rootSavingContext.save()
+                        }
+                    } catch {
+                        throw error
+                    }
+                }
+            })
+        } catch {
+            throw error
+        }
+    }
 
     public func removeStore() throws {
         try FileManager.default.removeItem(at: store.path() as URL)
